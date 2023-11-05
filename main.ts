@@ -1,4 +1,5 @@
-import { App, Editor, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Setting } from 'obsidian';
+import {TFile, Notice ,App, Editor, MarkdownView, Modal, Plugin, PluginSettingTab, Setting, 
+	SuggestModal} from 'obsidian';
 
 // Remember to rename these classes and interfaces!
 
@@ -13,16 +14,79 @@ const DEFAULT_SETTINGS: MyPluginSettings = {
 export default class MyPlugin extends Plugin {
 	settings: MyPluginSettings;
 
+	/**
+	 * 更新选中文档的最新修改日期、标题和分类，其中分类是通过切割所在路径后、排除根目录和最底层文件夹名称得到的。
+	 * 排除最底层文件夹是因为所有的文档都以 index.md 存储，
+	 * 真正的名称存储在父目录中，因此父目录作为文档的标题，不能作为一种分类。
+	 * @param activeFile 选中的文件
+	 * @returns 
+	 */
+	async updateMeta(activeFile : TFile) {
+		if(!activeFile) {
+			new Notice("请选中文件以更新属性");
+			return;
+		}
+		await this.app.fileManager.processFrontMatter(activeFile,
+		(frontMatter)=>{
+			console.log(frontMatter);
+			// 修改最近更新时间
+			frontMatter["lastmod"]=new Date(activeFile?.stat.mtime).toISOString();
+			
+			// 分类
+			frontMatter["categories"]=activeFile.path.split("/").slice(2,-2)
+
+			// 标题
+			frontMatter["title"] = activeFile.parent?.name
+
+			// 系列
+			//let series = this.app.vault.getAbstractFileByPath("content/series").children
+			
+		});
+	}
+	/**
+	 * 
+	 * @returns 获取系列，即content/series/下一级的所有目录名称。
+	 */
+	getSeries() :Series[] {
+		const series = this.app.vault?.getAbstractFileByPath("content/series")?.children;
+
+		const arr = new Array<Series>();
+		console.log(series)
+		series.forEach((item : any) => {
+			arr.push({title: item.name, description: item.name})
+		});
+		console.log(arr)
+		return arr;
+	}
+
 	async onload() {
 		await this.loadSettings();
-
+		// 侧边栏添加一个按钮
+		this.addRibbonIcon("info", "更新选中文档的最新修改日期、标题和分类",
+			async () => {
+				const activeFile = this.app.workspace.getActiveFile();
+				if(activeFile)
+				this.updateMeta(activeFile)
+			}
+		);
+		this.addCommand({
+			id: "update file properties",
+			name: "update file properties",
+			callback: async() => {
+				//const folderOrFile = this.app.vault.getAbstractFileByPath("demo1/hello.md")
+				const activeFile = this.app.workspace.getActiveFile();
+				this.updateMeta(activeFile)
+			}
+		});
+  
 		// This creates an icon in the left ribbon.
-		const ribbonIconEl = this.addRibbonIcon('dice', 'Sample Plugin', (evt: MouseEvent) => {
+		this.addRibbonIcon('dice', '修改文档属性-系列', (evt: MouseEvent) => {
 			// Called when the user clicks the icon.
-			new Notice('This is a notice!');
+			new SeriesleModal(this.app, this.getSeries()).open();
+				//async (result) => new Notice(`Hello, ${result.title}!`)).open();
 		});
 		// Perform additional things with the ribbon
-		ribbonIconEl.addClass('my-plugin-ribbon-class');
+		// ribbonIconEl.addClass('my-plugin-ribbon-class');
 
 		// This adds a status bar item to the bottom of the app. Does not work on mobile apps.
 		const statusBarItemEl = this.addStatusBarItem();
@@ -91,6 +155,64 @@ export default class MyPlugin extends Plugin {
 	}
 }
 
+
+interface Series {
+	title: string;
+	description: string;
+  }
+  
+
+export class SeriesleModal extends SuggestModal<Series> {
+	
+	series: Series[];
+	constructor(app: App, arr: Series[]) {
+		super(app);
+		this.series=arr;
+	}
+
+	// Returns all available suggestions.
+	getSuggestions(query: string): Series[] {
+	//   return ALL_BOOKS.filter((book) =>
+	// 	book.title.toLowerCase().includes(query.toLowerCase())
+	//   );
+		return this.series.filter((series) =>
+		series.title.toLowerCase().includes(query.toLowerCase()));
+	}
+	// Renders each suggestion item.
+	renderSuggestion(series: Series, el: HTMLElement) {
+		el.createEl("div", { text:  series.title});
+	  //el.createEl("small", { text: series });
+	}
+  
+	// Perform action on the selected suggestion.
+	async onChooseSuggestion(series: Series, evt: MouseEvent | KeyboardEvent) {
+	  new Notice(`Selected ${series.title}`);
+		await this.updateProp("series", [series.title]);
+	}
+
+	/**
+	 * 更改文档属性
+	 * @param key 属性名称
+	 * @param value 属性值
+	 * @returns 
+	 */
+	async updateProp(key:string, value:any) {
+		const activeFile = this.app.workspace.getActiveFile();
+		if(!activeFile) {
+			new Notice("请选中文件以更新属性");
+			return;
+		}
+		await this.app.fileManager.processFrontMatter(activeFile,
+		(frontMatter)=>{
+			console.log(frontMatter);			
+			// 系列
+			// let series = this.app.vault.getAbstractFileByPath("content/series").children
+			frontMatter[key]= value;
+		});
+	}
+  }
+
+
 class SampleModal extends Modal {
 	constructor(app: App) {
 		super(app);
@@ -98,7 +220,8 @@ class SampleModal extends Modal {
 
 	onOpen() {
 		const {contentEl} = this;
-		contentEl.setText('Woah!');
+		
+		contentEl.setText('Woah!!!!');
 	}
 
 	onClose() {
@@ -106,6 +229,7 @@ class SampleModal extends Modal {
 		contentEl.empty();
 	}
 }
+
 
 class SampleSettingTab extends PluginSettingTab {
 	plugin: MyPlugin;
@@ -132,3 +256,5 @@ class SampleSettingTab extends PluginSettingTab {
 				}));
 	}
 }
+
+
