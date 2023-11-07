@@ -1,5 +1,8 @@
-import {TFile, Notice ,App, Editor, MarkdownView, Modal, Plugin, PluginSettingTab, Setting, 
-	SuggestModal} from 'obsidian';
+
+import {
+    TFile, Notice, App, Editor, MarkdownView, Modal, Plugin, PluginSettingTab, Setting, SuggestModal, TFolder
+} from 'obsidian';
+import {AskModal} from "./AskModal";
 
 // Remember to rename these classes and interfaces!
 
@@ -19,7 +22,7 @@ export default class MyPlugin extends Plugin {
 	 * 排除最底层文件夹是因为所有的文档都以 index.md 存储，
 	 * 真正的名称存储在父目录中，因此父目录作为文档的标题，不能作为一种分类。
 	 * @param activeFile 选中的文件
-	 * @returns 
+	 * @returns
 	 */
 	async updateMeta(activeFile : TFile) {
 		if(!activeFile) {
@@ -28,63 +31,219 @@ export default class MyPlugin extends Plugin {
 		}
 		await this.app.fileManager.processFrontMatter(activeFile,
 		(frontMatter)=>{
-			console.log(frontMatter);
 			// 修改最近更新时间
 			frontMatter["lastmod"]=new Date(activeFile?.stat.mtime).toISOString();
-			
+
 			// 分类
 			frontMatter["categories"]=activeFile.path.split("/").slice(2,-2)
 
 			// 标题
-			frontMatter["title"] = activeFile.parent?.name
-
+			if (activeFile.parent) {
+				frontMatter["title"] = activeFile.parent?.name
+			}
 			// 系列
 			//let series = this.app.vault.getAbstractFileByPath("content/series").children
-			
+		}).then(()=> {
+			// const newPath = activeFile.parent?.path  + "/" + activeFile.parent?.name + ".md";
+			// console.log(newPath);
+			// this.app.vault.rename(activeFile, newPath);
 		});
 	}
+
+    /**
+     * 更新单个属性
+     * @param file
+     * @param key
+     * @param value
+     */
+    async updateMetaOne(file : TFile, key: string, value: any) {
+        if(!(file instanceof TFile)) { new Notice("请选中文件以更新属性"); return; }
+        await this.app.fileManager.processFrontMatter(file,
+            (frontMatter)=>{
+                frontMatter[key]=value;
+            })
+    }
+
 	/**
-	 * 
+	 * 插入模板
+	 * @param activeFile
+	 */
+	async insertTemplate(activeFile : TFile) {
+		if(!activeFile) { new Notice("请选中文件以更新属性"); return; }
+		await this.app.fileManager.processFrontMatter(activeFile,
+			(frontMatter)=>{
+				console.log(frontMatter);
+				frontMatter["date"]=new Date(activeFile?.stat.ctime).toISOString(); // 创建日期
+				frontMatter["lastmod"]=new Date(activeFile?.stat.mtime).toISOString(); // 修改最近更新时间
+				frontMatter["categories"]=activeFile.path.split("/").slice(2,-2); // 分类
+				frontMatter["title"] = activeFile.parent?.name // 标题
+				frontMatter["draft"] = "true"
+				frontMatter["tags"] = [];
+				frontMatter["series"] = [];
+				// 系列
+				//let series = this.app.vault.getAbstractFileByPath("content/series").children
+			});
+	}
+
+	/**
+	 *
 	 * @returns 获取系列，即content/series/下一级的所有目录名称。
 	 */
 	getSeries() :Series[] {
-		const series = this.app.vault?.getAbstractFileByPath("content/series")?.children;
+
+		const folderOrFile = this.app.vault?.getAbstractFileByPath("content/series")
+		// 把TAbstractFile强制转换为TFolder对象,这样才能调用children。
+		const series = (<TFolder>folderOrFile)?.children
 
 		const arr = new Array<Series>();
-		console.log(series)
 		series.forEach((item : any) => {
 			arr.push({title: item.name, description: item.name})
 		});
 		console.log(arr)
 		return arr;
 	}
-
 	async onload() {
 		await this.loadSettings();
-		// 侧边栏添加一个按钮
-		this.addRibbonIcon("info", "更新选中文档的最新修改日期、标题和分类",
-			async () => {
-				const activeFile = this.app.workspace.getActiveFile();
-				if(activeFile)
-				this.updateMeta(activeFile)
-			}
+		// const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+		// Make sure the user is editing a Markdown file.
+		// if (view) {
+		// 	const cursor = view.editor.getCursor();
+		// }
+
+		// 文件：新建帖子
+		this.registerEvent(
+			this.app.workspace.on("file-menu", (menu, file) => {
+				menu.addItem((item) => {
+					item
+						.setTitle("hugo:新建帖子")
+						.setIcon("document")
+						.onClick(async () => {
+							new Notice(file.path);
+							new AskModal(this.app, async (titleName)=>{
+								// new Notice(`Hello, ${result}`)
+                                if (file instanceof TFile) {
+                                    console.log("It's a file!");
+                                } else if (file instanceof TFolder) {
+                                    console.log("It's a folder!");
+									// 当前目录下创建文件夹
+									file.vault.createFolder(file.path + "/" + titleName);
+									// 创建index.zh-cn.md
+									const path = file.path + "/" + titleName + "/" +  "index.zh-cn.md";
+									await file.vault.create(path, "").then((f)=> {
+										new Notice("文档创建成功！")
+										this.insertTemplate(f);
+									});
+                                }
+								// this.app.vault.createFolder(result)
+							}).open();
+						});
+				});
+			})
 		);
-		this.addCommand({
-			id: "update file properties",
-			name: "update file properties",
-			callback: async() => {
-				//const folderOrFile = this.app.vault.getAbstractFileByPath("demo1/hello.md")
-				const activeFile = this.app.workspace.getActiveFile();
-				this.updateMeta(activeFile)
-			}
-		});
-  
+
+        // 编辑器：更新属性
+        this.registerEvent(this.app.workspace.on("editor-menu", (menu, editor, view) => {
+                menu.addItem((item) => {
+                    item
+                        .setTitle("hugo:更新属性")
+                        .setIcon("info")
+                        .onClick(async () => {
+                            if (view && view.file instanceof TFile) {
+                                this.updateMeta(view.file)
+                                // 改名字
+                            }
+                            else new Notice("未选中文档");
+                        });
+                });
+            })
+        );
+
+		// 编辑器：更新属性: 此操作会更新目录下的所有categories标签信息
+        this.registerEvent(
+            this.app.workspace.on("file-menu", (menu, file) => {
+                menu.addItem((item) => {
+                    item
+                        .setTitle("hugo:修改分类")
+                        .setIcon("document")
+                        .onClick(async () => {
+                            new Notice(file.path);
+                            new AskModal(this.app, async (newCategoryName)=>{
+                                if (file instanceof TFile) {
+                                    new Notice("请选中文件夹")
+                                } else if (file instanceof TFolder) {
+                                    // 修改目录名称
+                                    this.app.vault.rename(file, (file.parent?.path +"/" + newCategoryName))
+                                        .then(()=> {
+                                        console.log(file.path)
+                                        const mfs = file.vault.getMarkdownFiles();
+                                        mfs.forEach((mf)=> {
+                                            if (mf.path.contains(file.path)) {
+                                                // 新分类名称
+                                                const cs = mf.path.split("/").slice(2,-2)
+                                                this.updateMetaOne(mf, "categories", cs);
+                                            }
+                                        })
+                                    })
+                                }
+                                // this.app.vault.createFolder(result)
+                            }).open();
+                        });
+                });
+            })
+        );
+
+		// 编辑器：插入模板
+		this.registerEvent(this.app.workspace.on("editor-menu", (menu, editor, view) => {
+				menu.addItem((item) => {
+					item
+						.setTitle("hugo:插入模板")
+						.setIcon("info")
+						.onClick(async () => {
+							if (view && view.file instanceof TFile) this.insertTemplate(view.file)
+							else new Notice("未选中文档");
+						});
+				});
+			})
+		);
+		// 编辑器：获取系列
+		this.registerEvent(this.app.workspace.on("editor-menu", (menu, editor, view) => {
+				menu.addItem((item) => {
+					item
+						.setTitle("hugo:选择系列")
+						.setIcon("document")
+						.onClick(async () => {
+							new SeriesleModal(this.app, this.getSeries()).open();
+						});
+				});
+			})
+		);
+
+
+
+		// this.addCommand({
+		// 	id: "hugo:update file properties",
+		// 	name: "hugo:更新属性",
+		// 	callback: async() => {
+		// 		//const folderOrFile = this.app.vault.getAbstractFileByPath("demo1/hello.md")
+		// 		const activeFile = this.app.workspace.getActiveFile();
+		// 		if(activeFile) this.updateMeta(activeFile)
+		// 		else new Notice("未找到文件");
+		// 	}
+		// });
+
 		// This creates an icon in the left ribbon.
-		this.addRibbonIcon('dice', '修改文档属性-系列', (evt: MouseEvent) => {
-			// Called when the user clicks the icon.
-			new SeriesleModal(this.app, this.getSeries()).open();
-				//async (result) => new Notice(`Hello, ${result.title}!`)).open();
-		});
+		// this.addRibbonIcon('dice', '修改文档属性-系列', (evt: MouseEvent) => {
+		// 	// Called when the user clicks the icon.
+		// 	new SeriesleModal(this.app, this.getSeries()).open();
+		// 		//async (result) => new Notice(`Hello, ${result.title}!`)).open();
+		// });
+		// this.addRibbonIcon("info", "更新选中文档的最新修改日期、标题和分类",
+		// 	async () => {
+		// 		const activeFile = this.app.workspace.getActiveFile();
+		// 		if(activeFile)
+		// 			this.updateMeta(activeFile)
+		// 	}
+		// );
 		// Perform additional things with the ribbon
 		// ribbonIconEl.addClass('my-plugin-ribbon-class');
 
@@ -142,17 +301,10 @@ export default class MyPlugin extends Plugin {
 		this.registerInterval(window.setInterval(() => console.log('setInterval'), 5 * 60 * 1000));
 	}
 
-	onunload() {
+	onunload() { }
 
-	}
-
-	async loadSettings() {
-		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
-	}
-
-	async saveSettings() {
-		await this.saveData(this.settings);
-	}
+	async loadSettings() { this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData()); }
+	async saveSettings() { await this.saveData(this.settings); }
 }
 
 
@@ -160,10 +312,10 @@ interface Series {
 	title: string;
 	description: string;
   }
-  
+
 
 export class SeriesleModal extends SuggestModal<Series> {
-	
+
 	series: Series[];
 	constructor(app: App, arr: Series[]) {
 		super(app);
@@ -181,12 +333,12 @@ export class SeriesleModal extends SuggestModal<Series> {
 	// Renders each suggestion item.
 	renderSuggestion(series: Series, el: HTMLElement) {
 		el.createEl("div", { text:  series.title});
-	  //el.createEl("small", { text: series });
+		//el.createEl("small", { text: series });
 	}
-  
+
 	// Perform action on the selected suggestion.
 	async onChooseSuggestion(series: Series, evt: MouseEvent | KeyboardEvent) {
-	  new Notice(`Selected ${series.title}`);
+	new Notice(`Selected ${series.title}`);
 		await this.updateProp("series", [series.title]);
 	}
 
@@ -194,7 +346,7 @@ export class SeriesleModal extends SuggestModal<Series> {
 	 * 更改文档属性
 	 * @param key 属性名称
 	 * @param value 属性值
-	 * @returns 
+	 * @returns
 	 */
 	async updateProp(key:string, value:any) {
 		const activeFile = this.app.workspace.getActiveFile();
@@ -204,7 +356,7 @@ export class SeriesleModal extends SuggestModal<Series> {
 		}
 		await this.app.fileManager.processFrontMatter(activeFile,
 		(frontMatter)=>{
-			console.log(frontMatter);			
+			console.log(frontMatter);
 			// 系列
 			// let series = this.app.vault.getAbstractFileByPath("content/series").children
 			frontMatter[key]= value;
@@ -220,7 +372,6 @@ class SampleModal extends Modal {
 
 	onOpen() {
 		const {contentEl} = this;
-		
 		contentEl.setText('Woah!!!!');
 	}
 
