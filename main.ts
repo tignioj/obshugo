@@ -125,7 +125,7 @@ export default class MyPlugin extends Plugin {
                         .setIcon("document")
                         .onClick(async () => {
                             new Notice(file.path);
-                            new AskModal(this.app, async (titleName) => {
+                            const ask = new AskModal(this.app, async (titleName) => {
                                 // new Notice(`Hello, ${result}`)
                                 if (file instanceof TFile) {
                                     console.log("It's a file!");
@@ -141,7 +141,10 @@ export default class MyPlugin extends Plugin {
                                     });
                                 }
                                 // this.app.vault.createFolder(result)
-                            }).open();
+                            })
+                            ask.setTitle("输入帖子名称")
+                            ask.setOldValue("untitled")
+                            ask.open();
                         });
                 });
             })
@@ -156,7 +159,7 @@ export default class MyPlugin extends Plugin {
                         .onClick(async () => {
                             new Notice(file.path);
 
-                            new AskModal(this.app, async (newCategoryName) => {
+                            const ask = new AskModal(this.app, async (newCategoryName) => {
                                 if (file instanceof TFile) {
                                     new Notice("请选中文件夹")
                                 } else if (file instanceof TFolder) {
@@ -177,7 +180,10 @@ export default class MyPlugin extends Plugin {
                                         })
                                 }
                                 // this.app.vault.createFolder(result)
-                            }).open();
+                            })
+                            ask.setTitle("修改分类");
+                            ask.setOldValue(file.name);
+                            ask.open();
                         });
                 });
             })
@@ -209,18 +215,21 @@ export default class MyPlugin extends Plugin {
                             const file = view.file;
                             if (file instanceof TFile) {
                                 // 修改帖子标题，实际上是修改目录
-                                new AskModal(this.app, async (newPostName) => {
+                                const ask = new AskModal(this.app, async (newPostName) => {
                                     // 修改目录名称
                                     const newPath = file.parent?.parent?.path + "/" + newPostName;
                                     console.log(file.parent?.path, newPath);
-                                    this.app.fileManager.renameFile(<TFolder>file.parent,newPath)
+                                    this.app.fileManager.renameFile(<TFolder>file.parent, newPath)
                                         .then(() => {
                                             // 修改帖子
                                             console.log(file)
                                             this.updateMetaOne(file, "title", newPostName);
                                         })
                                     // this.app.vault.createFolder(result)
-                                }).open();
+                                })
+                                ask.setTitle("修改帖子名称")
+                                if (file.parent) ask.setOldValue(file.parent?.name)
+                                ask.open();
                             } else new Notice("这不是帖子，无效操作");
                         });
                 });
@@ -247,7 +256,7 @@ export default class MyPlugin extends Plugin {
                         .setTitle("hugo:选择系列")
                         .setIcon("document")
                         .onClick(async () => {
-                            new SeriesleModal(this.app, this.getSeries()).open();
+                            new SeriesModal(this.app, this.getSeries()).open();
                         });
                 });
             })
@@ -354,7 +363,7 @@ interface Series {
 }
 
 
-export class SeriesleModal extends SuggestModal<Series> {
+export class SeriesModal extends SuggestModal<Series> {
 
     series: Series[];
 
