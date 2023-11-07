@@ -170,7 +170,7 @@ export default class MyPlugin extends Plugin {
                                             mfs.forEach((mf) => {
                                                 if (mf.path.contains(file.path)) {
                                                     // 根据路径计算分类
-                                                    const cs = mf.path.split("/").slice(0, -2)
+                                                    const cs = mf.path.split("/").slice(2, -2)
                                                     this.updateMetaOne(mf, "categories", cs);
                                                 }
                                             })
