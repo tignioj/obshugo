@@ -15,10 +15,10 @@
 # 功能2：分类文件夹的创建与修改
 ## 注意：
 1. 仅content/posts目录下新建的文件夹被视作分类文件夹
-- 例如 /content/posts/Linux， 则Linux被视作一种分类.
-- 例如 /content/posts/Linux/Ubuntu， 则Linux,Ubuntu分别被视作一种分类
+	- 例如 /content/posts/Linux， 则Linux被视作一种分类.
+	- 例如 /content/posts/Linux/Ubuntu， 则Linux,Ubuntu分别被视作一种分类
 2. 当分类文件夹的直接子目录（就是第一层子目录）包含.md文件，则不被视为分类文件夹，而是文档的标题。
-- 例如 /content/posts/Linux/Ubuntu/Ubuntu开启Samba/index.zh-cn.md (注意obsidian不会显示md拓展名称), 则Linux, Ubuntu是分类文件夹，而Ubuntu开启Samba由于子目录含有md文件，则不被视作分类文件夹。
+   - 例如 /content/posts/Linux/Ubuntu/Ubuntu开启Samba/index.zh-cn.md (注意obsidian不会显示md拓展名称), 则`Linux`, `Ubuntu`是分类文件夹，而`Ubuntu开启Samba`由于子目录含有md文件，则不被视作分类文件夹。
 3. 分类文件夹的名称会被自动写入到md文件的index.zh-cn.md文档的`categories`属性当中，作为文档的分类。
 
 ## 分类文件夹的创建: 右键content/posts的子目录下，右键`hugo:添加分类`
@@ -56,7 +56,9 @@ title: Ubuntu安装Samba
 ```
 其中
 - `lastmod`: 基于文档的最后修改时间，格式化为ISO 8061标准时间
-- `categories` 的值基于文档所在路径，对路径进行切割，排除掉根目录和文档所在的目录后，得到的数组, 请不要直接修改该值，而是通过`修改分类名称`的方式。
+- `categories` 的值基于文档所在路径，对路径进行切割，排除掉根目录和文档所在的目录后，得到的数组
+  - 请不要直接修改该值，而是通过`hugo:修改分类名称`的方式来修改某个分类的名称
+  - 或者移动帖子路径后，对移动后的文档右键执行`hugo:更新属性`操作来更新分类。
 - `title` 则是文档名称，基于父目录的名称。因为文档本身的名称需要用来标识何种语言的文档，因此md文件不能用文档标题作为名称。
 
 > 注意：文档变更目录时，应当移动.md的父目录（也就是标题目录)，移动到新的分类文件夹后，只需要打开md文件，右键点击`hugo:更新属性`，就会自动获取修改categories为新的值(同时会修改lastmod)
