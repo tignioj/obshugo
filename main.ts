@@ -18,19 +18,28 @@ import moment from "moment";
 
 // 常量配置
 // 文档目录
-const POSTS_PATH = "content/posts"
-
-// Remember to rename these classes and interfaces!
-interface MyPluginSettings {
-	mySetting: string;
+interface ObsHugoSettings {
+	momentDateFormat: string;
+	toggleAutoUpdateLastMod: boolean;
+	toggleAutoCategories: true; // TODO：自动分类开关
+	postPath: string;
+	timeout: string;
 }
 
-const DEFAULT_SETTINGS: MyPluginSettings = {
-	mySetting: 'default'
+const DEFAULT_SETTINGS: ObsHugoSettings = {
+	momentDateFormat: "YYYY-MM-DDTHH:mm:ssZ", /*https://momentjscom.readthedocs.io/en/latest/moment/04-displaying/01-format/*/
+	toggleAutoUpdateLastMod: true,
+	toggleAutoCategories: true, // 自动分类
+	postPath: "content/posts",
+	timeout: '5', // ms
 }
+
+
+
+
 
 export default class MyPlugin extends Plugin {
-	settings: MyPluginSettings;
+	settings: ObsHugoSettings;
 
 	/**
 	 * 更新选中文档的最新修改日期、标题和分类，其中分类是通过切割所在路径后、排除根目录和最底层文件夹名称得到的。
@@ -48,7 +57,7 @@ export default class MyPlugin extends Plugin {
 			(frontMatter) => {
 				// 修改最近更新时间
 				// frontMatter["lastmod"] = new Date(activeFile?.stat.mtime).toISOString();
-				frontMatter["lastmod"] = moment(activeFile?.stat.mtime).toISOString(true); // 时区
+				frontMatter["lastmod"] = moment(activeFile?.stat.mtime).format(this.settings.momentDateFormat); // 时区
 
 				// 分类
 				frontMatter["categories"] = activeFile.path.split("/").slice(2, -2)
@@ -90,8 +99,8 @@ export default class MyPlugin extends Plugin {
 		await this.app.fileManager.processFrontMatter(activeFile,
 			(frontMatter) => {
 				console.log(frontMatter);
-				frontMatter["date"] = moment(activeFile?.stat.ctime).toISOString(true); // 创建日期
-				frontMatter["lastmod"] = moment(activeFile?.stat.mtime).toISOString(true); // 修改最近更新时间
+				frontMatter["date"] = moment(activeFile?.stat.ctime).format(this.settings.momentDateFormat); // 创建日期
+				frontMatter["lastmod"] = moment(activeFile?.stat.mtime).format(this.settings.momentDateFormat); // 修改最近更新时间
 				frontMatter["categories"] = activeFile.path.split("/").slice(2, -2); // 分类
 				frontMatter["title"] = activeFile.parent?.name // 标题
 				frontMatter["draft"] = "true"
@@ -344,11 +353,35 @@ export default class MyPlugin extends Plugin {
 			}
 		);
 
-		this.registerEvent(this.app.vault.on("rename", async (file, oldPath) => {
+		this.registerEvent(this.app.workspace.on("editor-change", async (file, oldPath) => {
 			// console.log(file);
 		}))
+
+
+		// 检测到文档修改就更新lastmod属性
+		let timeoutId: ReturnType<typeof setTimeout>;
+		let callBySystem = false; // 系统的修改lastmod标志
 		this.registerEvent(this.app.vault.on("modify", (file) => {
-			console.log(file);
+			if (!this.settings.toggleAutoUpdateLastMod) return; // 是否开启自动更新lastmod
+			if (!file.path.startsWith(this.settings.postPath)) return;
+			const context = this;
+			if (file instanceof TFile && !callBySystem) { // 非系统触发的修改:即用户触发的修改
+				// 清除之前的定时器
+				clearTimeout(timeoutId);
+				// 设置新的定时器，在输入停止后的 2000 毫秒执行操作
+				// 延迟触发函数
+				timeoutId = setTimeout(function() {
+					// 在这里执行你的操作
+					console.log('用户停止输入了，现在可以执行相关操作');
+					callBySystem = true;
+					// 执行修改后，callBySystem一定会变成true, 这次的修改事件会被监听到，
+					// 但是判断到callBySystem时，会跳过这次修改, 然后将callBySystem修改为false，又继续正常监听用户输入。
+					context.updateMetaOne(file, 'lastmod',
+						moment(file?.stat.mtime).format(context.settings.momentDateFormat)); // 修改最近更新时间)
+				}, Number(context.settings.timeout)*1000);
+
+			} else callBySystem = false;
+
 		}))
 
 		this.registerEvent(this.app.workspace.on("codemirror", (cm) => {
@@ -443,9 +476,9 @@ export default class MyPlugin extends Plugin {
 		if (file instanceof TFile) return false;
 		if (file instanceof TFolder) {
 			// 不是指定目录下的文件夹，不是分类文件夹
-			if (!file.path.startsWith(POSTS_PATH)) return false;
+			if (!file.path.startsWith(this.settings.postPath)) return false;
 			// posts本身不是分类文件夹
-			if (file.path == POSTS_PATH) return false;
+			if (file.path == this.settings.postPath) return false;
 			// 一级目录下包含.md文件的文件夹，不是分类文件夹，而是文档标题
 			const items = file.children;
 			for(let i= 0 ;i < items.length; i++) {
@@ -464,7 +497,7 @@ export default class MyPlugin extends Plugin {
 	 * @param file
 	 */
 	isPostsFolder(file: TAbstractFile): boolean {
-		if (file instanceof TFolder && file.path == POSTS_PATH)  return true;
+		if (file instanceof TFolder && file.path == this.settings.postPath)  return true;
 		return this.isCategoryFolder(file);
 	}
 }
@@ -474,6 +507,7 @@ interface Series {
 	title: string;
 	description: string;
 }
+
 
 
 export class SeriesModal extends SuggestModal<Series> {
@@ -560,13 +594,48 @@ class SampleSettingTab extends PluginSettingTab {
 		containerEl.empty();
 
 		new Setting(containerEl)
-			.setName('Setting #1')
-			.setDesc('It\'s a secret')
+			.setName('自动更新')
+			.setDesc('停止输入后多少秒自动更新lastmod，不建议设置太低否则会频繁触发合并事件，允许范围2~60')
 			.addText(text => text
-				.setPlaceholder('Enter your secret')
-				.setValue(this.plugin.settings.mySetting)
+				.setPlaceholder('4')
+				.setValue(this.plugin.settings.timeout)
 				.onChange(async (value) => {
-					this.plugin.settings.mySetting = value;
+					if (Number(value) < 2 || Number(value)> 60) {
+						new Notice("无效设置")
+						return;
+					}
+					this.plugin.settings.timeout = value;
+					await this.plugin.saveSettings();
+				})).addToggle(toggle=> {
+					toggle.setValue(this.plugin.settings.toggleAutoUpdateLastMod)
+						.onChange(async value => {
+							this.plugin.settings.toggleAutoUpdateLastMod = value;
+							await this.plugin.saveSettings();
+						})
+		});
+
+		new Setting(containerEl)
+			.setName('文档路径')
+			.setDesc('存放文档的路径,默认是content/posts, 注意不要开头加上\'/\'')
+			.addText(text => text
+				.setPlaceholder('content/posts')
+				.setValue(this.plugin.settings.postPath)
+				.onChange(async (value) => {
+					if (this.app.vault.getAbstractFileByPath(value) == null) {
+						return;
+					}
+					this.plugin.settings.postPath = value;
+					await this.plugin.saveSettings();
+				}));
+
+		new Setting(containerEl)
+			.setName('日期格式')
+			.setDesc('采用momentjs, 默认ISO8601，更多格式请查看文档 https://momentjscom.readthedocs.io/en/latest/moment/04-displaying/01-format/')
+			.addText(text => text
+				.setPlaceholder('content/posts')
+				.setValue(this.plugin.settings.momentDateFormat)
+				.onChange(async (value) => {
+					this.plugin.settings.momentDateFormat= value;
 					await this.plugin.saveSettings();
 				}));
 	}
