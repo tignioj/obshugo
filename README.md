@@ -34,7 +34,8 @@
 
 简而言之，md文档的父目录都是该文档的分类，当分类名称修改时，会被自动写入md文件的`categories`的属性当中。
 
-## 更新分类、标题和上次修改时间
+# 功能3: 文档属性自动变更(标题，分类，lastmod)
+## 目录结构说明
 文档目录结构为
 
 
@@ -47,8 +48,12 @@
               |index.zh-cn.md     <--中文文档
               |index.en.md        <--英文文档
 
+- content/posts下，任意目录的变更都会导致其子文件夹下的md文件执行更新属性操作，包括(title、lastmod、categories)
+  - 当你想要修改标题时，不要手动修改title,而是修改目录名称，md文件会检测到并自动同步。
+  - 例如`Ubuntu安装Samba`修改为`UbuntuTest`，则`index.zh-cn.md`和`index.en.md`的`title`会相应改为`UbuntuTest`
+- 也可以手动执行更新属性操作， 打开index.zh-cn.md右键`hugo:更新属性`
 
-当选中 index.zh-cn.md时候，执行 "hugo:更新属性"时候，则自动生成如下内容
+## 格式说明
 ```yaml
 ---
 lastmod: 2023-11-05T21:52:00.743Z
@@ -61,9 +66,9 @@ title: Ubuntu安装Samba
 ```
 其中
 - `lastmod`: 基于文档的最后修改时间，格式化为ISO 8061标准时间
-- `categories` 的值基于文档所在路径，对路径进行切割，排除掉根目录和文档所在的目录后，得到的数组
+- `categories`: 基于文档所在路径，对路径进行切割，排除掉根目录和文档所在的目录后，得到的数组
   - 请不要直接修改该值，通过重命名分类文件夹或者移动文档路径后，该值会被自动重新赋值。
-- `title` 则是文档名称，基于父目录的名称。因为文档本身的名称需要用来标识何种语言的文档，因此md文件不能用文档标题作为名称。
+- `title`: 文档名称，基于父目录的名称。因为文档本身的名称需要用来标识何种语言的文档，因此md文件不能用文档标题作为名称。
 
 > 注意：文档变更目录时，应当移动.md的父目录（也就是标题目录)，移动到新的分类文件夹后，会自动修改categories为新的值
 
@@ -138,7 +143,7 @@ series:
 
 # 功能5：发布帖子
 //TODO 实现发布帖子。
-- 暂时先用其他插件执行git命令发布帖子，这里推荐shell command, 安装完成后，填写一下几条命令基本上没问题了
+- 暂时先用其他插件执行git命令发布帖子，这里推荐[shell command](https://github.com/Taitava/obsidian-shellcommands)插件, 安装完成后，填写一下几条命令基本上没问题了
 ```shell
 git add {{folder_path:relative}}
 git commit -m "{{folder_name}}"

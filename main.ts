@@ -161,37 +161,6 @@ export default class MyPlugin extends Plugin {
 			})
 		);
 
-		// 编辑器-右键菜单，修改帖子标题
-		this.registerEvent(this.app.workspace.on("editor-menu", (menu, editor, view) => {
-				menu.addItem((item) => {
-					item
-						.setTitle("hugo:修改标题")
-						.setIcon("info")
-						.onClick(async () => {
-							const file = view.file;
-							if (file instanceof TFile) {
-								// 修改帖子标题，实际上是修改目录
-								const ask = new AskModal(this.app, async (newPostName) => {
-									// 修改目录名称
-									const newPath = file.parent?.parent?.path + "/" + newPostName;
-									// console.log(file.parent?.path, newPath);
-									this.app.fileManager.renameFile(<TFolder>file.parent, newPath)
-										.then(() => {
-											// 修改帖子
-											// console.log(file)
-											updateMetaOne(file, "title", newPostName);
-										})
-									// this.app.vault.createFolder(result)
-								})
-								ask.setTitle("修改帖子名称")
-								if (file.parent) ask.setOldValue(file.parent?.name)
-								ask.open();
-							} else new Notice("这不是帖子，无效操作");
-						});
-				});
-			})
-		);
-
 		// // 编辑器-右键菜单：插入模板
 		// this.registerEvent(this.app.workspace.on("editor-menu", (menu, editor, view) => {
 		// 		menu.addItem((item) => {
@@ -233,8 +202,9 @@ export default class MyPlugin extends Plugin {
 		// 检测到文档移动
 		this.registerEvent(this.app.vault.on("rename", file => {
 			console.log("rename",file.path);
-			if (file instanceof TFile && file.name.endsWith("md"))
-				updateMetaOne(file, "categories", getCategory(file))
+			if (file instanceof TFile && file.name.endsWith("md")) {
+				updateMeta(this.settings, file);
+			}
 		}))
 
 
