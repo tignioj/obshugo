@@ -1,9 +1,9 @@
 {
 	"id": "obsidian-hugo-helper",
 	"name": "hugo-helper",
-	"version": "1.0.0",
+	"version": "1.0.1",
 	"minAppVersion": "0.15.0",
-	"description": "用于快捷创建hugo文章、自动修改标题，分类，最后修改时间信息",
+	"description": "用于快捷创建hugo文章、自动修改标题，分类，最后修改时间信息。",
 	"author": "tignioj",
 	"authorUrl": "https://github.com/tignioj",
 	"isDesktopOnly": false
