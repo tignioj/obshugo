@@ -26,7 +26,7 @@ const DEFAULT_SETTINGS: ObsHugoSettings = {
 	toggleAutoUpdateLastMod: true,
 	toggleAutoCategories: true, // 自动分类
 	postPath: "content/posts",
-	timeout: '5', // ms
+	timeout: '5', // 停止输入后多少秒更新lastmod属性
 }
 
 /**
@@ -37,11 +37,8 @@ const DEFAULT_SETTINGS: ObsHugoSettings = {
  * @param activeFile 选中的文件
  * @returns
  */
-async function updateMeta(settings: ObsHugoSettings,activeFile: TFile) {
-	if (!activeFile) {
-		new Notice("请选中文件以更新属性");
-		return;
-	}
+async function updateMeta(settings: ObsHugoSettings,activeFile: TAbstractFile) {
+	if (!(activeFile instanceof TFile)) return;
 	await this.app.fileManager.processFrontMatter(activeFile,
 		(frontMatter: any) => {
 			// 修改最近更新时间
@@ -72,7 +69,16 @@ function getCategory(file: TFile) {
  * @param key
  * @param value
  */
-async function updateMetaOne(file: TFile, key: string, value: any) {
+async function updateMetaOne(file: TAbstractFile, key: string, value: any) {
+	// 检查文件是否被删除
+	// @ts-ignore
+	// 由于deleted是被动态赋值的，但是编译时候是无法检测到deleted属性，
+	// 因此应该使用@ts-ignore注解跳过检查
+	if(file['deleted']) {
+		// console.log("文档已经被删除，无法修改!", file)
+		return
+	}
+	if (!(file instanceof TFile)) return;
 	await this.app.fileManager.processFrontMatter(file,
 		(frontMatter: any) => {
 			frontMatter[key] = value;
@@ -93,7 +99,7 @@ export default class MyPlugin extends Plugin {
 		}
 		await this.app.fileManager.processFrontMatter(activeFile,
 			(frontMatter) => {
-				console.log(frontMatter);
+				// console.log(frontMatter);
 				frontMatter["date"] = moment(activeFile?.stat.ctime).format(this.settings.momentDateFormat); // 创建日期
 				frontMatter["lastmod"] = moment(activeFile?.stat.mtime).format(this.settings.momentDateFormat); // 修改最近更新时间
 				frontMatter["categories"] = activeFile.path.split("/").slice(2, -2); // 分类
@@ -200,7 +206,7 @@ export default class MyPlugin extends Plugin {
 
 		// 检测到文档移动
 		this.registerEvent(this.app.vault.on("rename", file => {
-			console.log("rename",file.path);
+			// console.log("rename",file.path);
 			if (file instanceof TFile && file.name.endsWith("md")) {
 				updateMeta(this.settings, file);
 			}
@@ -237,14 +243,6 @@ export default class MyPlugin extends Plugin {
 		// This adds a settings tab so the user can configure various aspects of the plugin
 		this.addSettingTab(new SampleSettingTab(this.app, this));
 
-		// If the plugin hooks up any global DOM events (on parts of the app that doesn't belong to this plugin)
-		// Using this function will automatically remove the event listener when this plugin is disabled.
-		// this.registerDomEvent(document, 'click', (evt: MouseEvent) => {
-		// 	console.log('click', evt);
-		// });
-
-		// When registering intervals, this function will automatically clear the interval when the plugin is disabled.
-		this.registerInterval(window.setInterval(() => console.log('setInterval'), 5 * 60 * 1000));
 	}
 
 	/**
