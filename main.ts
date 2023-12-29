@@ -275,7 +275,7 @@ export default class MyPlugin extends Plugin {
 			// this.app.vault.createFolder(result)
 		})
 		ask.setTitle("输入文章标题")
-		const defaultTitle = moment(new Date()).format("Y-MM-dd-HHmmss")
+		const defaultTitle = moment(new Date()).format("Y-MM-DD-HHmmss")
 		ask.setOldValue(defaultTitle)
 		ask.open();
 	}
