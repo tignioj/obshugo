@@ -35,12 +35,8 @@ const DEFAULT_SETTINGS: ObsHugoSettings = {
 }
 
 
-
-
-
 export default class MyPlugin extends Plugin {
 	settings: ObsHugoSettings;
-
 	/**
 	 * 更新选中文档的最新修改日期、标题和分类，其中分类是通过切割所在路径后、排除根目录和最底层文件夹名称得到的。
 	 * 排除最底层文件夹是因为所有的文档都以 index.md 存储，
