@@ -2,9 +2,6 @@ import {
 	TFile,
 	Notice,
 	App,
-	Editor,
-	MarkdownView,
-	Modal,
 	Plugin,
 	PluginSettingTab,
 	Setting,
@@ -12,8 +9,7 @@ import {
 	TFolder, TAbstractFile,
 } from 'obsidian';
 import {AskModal} from "./AskModal";
-import {EditorView} from "@codemirror/view";
-import {EditorSelection} from "@codemirror/state";
+
 import moment from "moment";
 
 // 常量配置
@@ -34,57 +30,59 @@ const DEFAULT_SETTINGS: ObsHugoSettings = {
 	timeout: '5', // ms
 }
 
+/**
+ * 更新选中文档的最新修改日期、标题和分类，其中分类是通过切割所在路径后、排除根目录和最底层文件夹名称得到的。
+ * 排除最底层文件夹是因为所有的文档都以 index.md 存储，
+ * 真正的名称存储在父目录中，因此父目录作为文档的标题，不能作为一种分类。
+ * @param settings 插件配置
+ * @param activeFile 选中的文件
+ * @returns
+ */
+async function updateMeta(settings: ObsHugoSettings,activeFile: TFile) {
+	if (!activeFile) {
+		new Notice("请选中文件以更新属性");
+		return;
+	}
+	await this.app.fileManager.processFrontMatter(activeFile,
+		(frontMatter: any) => {
+			// 修改最近更新时间
+			// frontMatter["lastmod"] = new Date(activeFile?.stat.mtime).toISOString();
+			frontMatter["lastmod"] = moment(activeFile?.stat.mtime).format(settings.momentDateFormat); // 时区
+
+			// 分类
+			frontMatter["categories"] = getCategory(activeFile)
+
+			// 标题
+			if (activeFile.parent) {
+				frontMatter["title"] = activeFile.parent?.name
+			}
+			// 系列
+			//let series = this.app.vault.getAbstractFileByPath("content/series").children
+		}).then(() => {
+		// const newPath = activeFile.parent?.path  + "/" + activeFile.parent?.name + ".md";
+		// console.log(newPath);
+		// this.app.vault.rename(activeFile, newPath);
+	});
+}
+function getCategory(file: TFile) {
+	return file.path.split("/").slice(2, -2)
+}
+/**
+ * 更新单个属性
+ * @param file
+ * @param key
+ * @param value
+ */
+async function updateMetaOne(file: TFile, key: string, value: any) {
+	await this.app.fileManager.processFrontMatter(file,
+		(frontMatter: any) => {
+			frontMatter[key] = value;
+		})
+}
+
 
 export default class MyPlugin extends Plugin {
 	settings: ObsHugoSettings;
-
-	/**
-	 * 更新选中文档的最新修改日期、标题和分类，其中分类是通过切割所在路径后、排除根目录和最底层文件夹名称得到的。
-	 * 排除最底层文件夹是因为所有的文档都以 index.md 存储，
-	 * 真正的名称存储在父目录中，因此父目录作为文档的标题，不能作为一种分类。
-	 * @param activeFile 选中的文件
-	 * @returns
-	 */
-	async updateMeta(activeFile: TFile) {
-		if (!activeFile) {
-			new Notice("请选中文件以更新属性");
-			return;
-		}
-		await this.app.fileManager.processFrontMatter(activeFile,
-			(frontMatter) => {
-				// 修改最近更新时间
-				// frontMatter["lastmod"] = new Date(activeFile?.stat.mtime).toISOString();
-				frontMatter["lastmod"] = moment(activeFile?.stat.mtime).format(this.settings.momentDateFormat); // 时区
-
-				// 分类
-				frontMatter["categories"] = activeFile.path.split("/").slice(2, -2)
-
-				// 标题
-				if (activeFile.parent) {
-					frontMatter["title"] = activeFile.parent?.name
-				}
-				// 系列
-				//let series = this.app.vault.getAbstractFileByPath("content/series").children
-			}).then(() => {
-			// const newPath = activeFile.parent?.path  + "/" + activeFile.parent?.name + ".md";
-			// console.log(newPath);
-			// this.app.vault.rename(activeFile, newPath);
-		});
-	}
-
-	/**
-	 * 更新单个属性
-	 * @param file
-	 * @param key
-	 * @param value
-	 */
-	async updateMetaOne(file: TFile, key: string, value: any) {
-		await this.app.fileManager.processFrontMatter(file,
-			(frontMatter) => {
-				frontMatter[key] = value;
-			})
-	}
-
 	/**
 	 * 插入模板
 	 * @param activeFile
@@ -123,26 +121,12 @@ export default class MyPlugin extends Plugin {
 		series.forEach((item: any) => {
 			arr.push({title: item.name, description: item.name})
 		});
-		console.log(arr)
+		// console.log(arr)
 		return arr;
 	}
 
 	async onload() {
-		// this.registerMarkdownPostProcessor(
-		// 	(element, context) => {
-		// 	const links = element.findAll(".internal-link")
-		// 		for(const link of links) {
-		// 			const s=link.getAttribute("data-href")
-		// 			if (s) {
-		// 				console.log("attr",s)
-		// 				const ns = s.replace(/.*\/(.*)\/index.zh-cn.md/g, "$1")
-		// 				link.setText(ns)
-		// 			}
-		// 		}
-		// });
-		//
 		await this.loadSettings();
-
 
 		// 文件：新建帖子
 		this.registerEvent(
@@ -160,62 +144,6 @@ export default class MyPlugin extends Plugin {
 				});
 			})
 		);
-		// 文件：新建分类
-		this.registerEvent(
-			this.app.workspace.on("file-menu", (menu, file) => {
-				if (!this.isPostsFolder(file)) return;// 如果不是分类文件夹，不可修改
-				menu.addItem((item) => {
-					item.setTitle("hugo:添加分类").setIcon("document").onClick(async () => {
-						const ask = new AskModal(this.app, async (newCategoryName) => {
-							this.app.vault.createFolder(file.path + "/" + newCategoryName);
-						});
-						ask.setTitle("输入添加的分类名称");
-						ask.setOldValue("")
-						ask.open();
-					})
-				})
-			})
-		)
-
-		// 文件：修改分类  此操作会更新目录下的所有categories标签信息
-		this.registerEvent(
-			this.app.workspace.on("file-menu", (menu, file) => {
-				if (!this.isCategoryFolder(file)) return;// 如果不是分类文件夹，不可修改
-
-				menu.addItem((item) => {
-					item
-						.setTitle("hugo:修改分类名称")
-						.setIcon("document")
-						.onClick(async () => {
-							new Notice(file.path);
-							const ask = new AskModal(this.app, async (newCategoryName) => {
-								if (file instanceof TFolder) {
-									// 修改目录名称
-									// this.app.vault.rename(file, (file.parent?.path +"/" + newCategoryName))
-									this.app.fileManager.renameFile(file, (file.parent?.path + "/" + newCategoryName))
-										.then(() => {
-											console.log(file.path)
-											const mfs = file.vault.getMarkdownFiles();
-											// 匹配路径下的所有Markdown都要修改分类信息
-											mfs.forEach((mf) => {
-												if (mf.path.contains(file.path)) {
-													// 根据路径计算分类
-													const cs = mf.path.split("/").slice(2, -2)
-													this.updateMetaOne(mf, "categories", cs);
-												}
-											})
-										})
-								}
-								// this.app.vault.createFolder(result)
-							})
-							ask.setTitle("修改分类");
-							ask.setOldValue(file.name);
-							ask.open();
-						});
-				});
-			})
-		);
-
 
 		// 编辑器：更新属性
 		this.registerEvent(this.app.workspace.on("editor-menu", (menu, editor, view) => {
@@ -225,7 +153,7 @@ export default class MyPlugin extends Plugin {
 						.setIcon("info")
 						.onClick(async () => {
 							if (view && view.file instanceof TFile) {
-								this.updateMeta(view.file)
+								updateMeta(this.settings,view.file)
 								// 改名字
 							} else new Notice("未选中文档");
 						});
@@ -246,12 +174,12 @@ export default class MyPlugin extends Plugin {
 								const ask = new AskModal(this.app, async (newPostName) => {
 									// 修改目录名称
 									const newPath = file.parent?.parent?.path + "/" + newPostName;
-									console.log(file.parent?.path, newPath);
+									// console.log(file.parent?.path, newPath);
 									this.app.fileManager.renameFile(<TFolder>file.parent, newPath)
 										.then(() => {
 											// 修改帖子
-											console.log(file)
-											this.updateMetaOne(file, "title", newPostName);
+											// console.log(file)
+											updateMetaOne(file, "title", newPostName);
 										})
 									// this.app.vault.createFolder(result)
 								})
@@ -291,24 +219,6 @@ export default class MyPlugin extends Plugin {
 			})
 		);
 
-
-		// this.addCommand({
-		// 	id: "hugo:update file properties",
-		// 	name: "hugo:更新属性",
-		// 	callback: async() => {
-		// 		//const folderOrFile = this.app.vault.getAbstractFileByPath("demo1/hello.md")
-		// 		const activeFile = this.app.workspace.getActiveFile();
-		// 		if(activeFile) this.updateMeta(activeFile)
-		// 		else new Notice("未找到文件");
-		// 	}
-		// });
-
-		// This creates an icon in the left ribbon.
-		// this.addRibbonIcon('dice', '修改文档属性-系列', (evt: MouseEvent) => {
-		// 	// Called when the user clicks the icon.
-		// 	new SeriesleModal(this.app, this.getSeries()).open();
-		// 		//async (result) => new Notice(`Hello, ${result.title}!`)).open();
-		// });
 		this.addRibbonIcon("file-plus-2",
 			"hugo:新建帖子",
 			async () => {
@@ -317,8 +227,14 @@ export default class MyPlugin extends Plugin {
 			}
 		);
 
-		this.registerEvent(this.app.workspace.on("editor-change", async (file, oldPath) => {
-			// console.log(file);
+		this.registerEvent(this.app.workspace.on("window-close", async (file, oldPath) => {
+		}))
+
+		// 检测到文档移动
+		this.registerEvent(this.app.vault.on("rename", file => {
+			console.log("rename",file.path);
+			if (file instanceof TFile && file.name.endsWith("md"))
+				updateMetaOne(file, "categories", getCategory(file))
 		}))
 
 
@@ -336,20 +252,16 @@ export default class MyPlugin extends Plugin {
 				// 延迟触发函数
 				timeoutId = setTimeout(function () {
 					// 在这里执行你的操作
-					console.log('用户停止输入了，现在可以执行相关操作');
+					// console.log('用户停止输入了，现在可以执行相关操作');
 					callBySystem = true;
 					// 执行修改后，callBySystem一定会变成true, 这次的修改事件会被监听到，
 					// 但是判断到callBySystem时，会跳过这次修改, 然后将callBySystem修改为false，又继续正常监听用户输入。
-					context.updateMetaOne(file, 'lastmod',
+					updateMetaOne(file, 'lastmod',
 						moment(file?.stat.mtime).format(context.settings.momentDateFormat)); // 修改最近更新时间)
-				}, Number(context.settings.timeout) * 1000);
+				}, Number(context.settings.timeout) * 1000 /*延迟多少毫秒执行*/);
 
 			} else callBySystem = false;
 
-		}))
-
-		this.registerEvent(this.app.workspace.on("codemirror", (cm) => {
-			console.log("cm!!!");
 		}))
 
 
@@ -394,7 +306,8 @@ export default class MyPlugin extends Plugin {
 			// this.app.vault.createFolder(result)
 		})
 		ask.setTitle("输入帖子名称")
-		ask.setOldValue("untitled")
+		const defaultTitle = moment(new Date()).format("Y-MM-dd-HHmmss")
+		ask.setOldValue(defaultTitle)
 		ask.open();
 	}
 
@@ -448,6 +361,7 @@ export default class MyPlugin extends Plugin {
 }
 
 
+
 interface Series {
 	title: string;
 	description: string;
@@ -481,31 +395,15 @@ export class SeriesModal extends SuggestModal<Series> {
 	// Perform action on the selected suggestion.
 	async onChooseSuggestion(series: Series, evt: MouseEvent | KeyboardEvent) {
 		new Notice(`Selected ${series.title}`);
-		await this.updateProp("series", [series.title]);
-	}
+		// await this.updateProp("series", [series.title]);
 
-	/**
-	 * 更改文档属性
-	 * @param key 属性名称
-	 * @param value 属性值
-	 * @returns
-	 */
-	async updateProp(key: string, value: any) {
 		const activeFile = this.app.workspace.getActiveFile();
 		if (!activeFile) {
-			new Notice("请选中文件以更新属性");
 			return;
 		}
-		await this.app.fileManager.processFrontMatter(activeFile,
-			(frontMatter) => {
-				console.log(frontMatter);
-				// 系列
-				// let series = this.app.vault.getAbstractFileByPath("content/series").children
-				frontMatter[key] = value;
-			});
+		await updateMetaOne(activeFile,"series", [series.title]);
 	}
 }
-
 
 
 class SampleSettingTab extends PluginSettingTab {
