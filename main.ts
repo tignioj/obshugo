@@ -432,10 +432,13 @@ export default class MyPlugin extends Plugin {
 		new Notice(file.path);
 		const ask = new AskModal(this.app, async (titleName) => {
 			// new Notice(`Hello, ${result}`)
-			if (file instanceof TFile) {
-				console.log("It's a file!");
-			} else if (file instanceof TFolder) {
-				console.log("It's a folder!");
+			if (file instanceof TFolder) {
+				// 检测目录是否已经存在，存在则报错
+				const exf = this.app.vault.getAbstractFileByPath(file.path + "/" + titleName)
+				if (exf instanceof TFolder) {
+					new Notice("已经存在同名目录，请重新设置帖子标题")
+					return
+				}
 				// 当前目录下创建文件夹
 				file.vault.createFolder(file.path + "/" + titleName);
 				// 创建index.zh-cn.md
