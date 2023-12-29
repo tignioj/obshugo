@@ -153,10 +153,10 @@ git push origin main
 
 
 # 安装插件
-1. 新建一个用于存放我们插件的文件夹，名字就叫 obshugo 
+1. 新建一个用于存放我们插件的文件夹，名字就叫 hugo-helper
 
 ```shell
-mkdir -p .obsidian/plugins/obshugo/
+mkdir -p .obsidian/plugins/hugo-helper/
 ``````
 
 2. 复制 `main.js`和`style.css`以及`manifest.json`四个文件到刚刚创建的目录下
@@ -165,14 +165,14 @@ mkdir -p .obsidian/plugins/obshugo/
         |仓库
         |.obsidian
           |plugins
-            |obshugo
+            |hugo-helper
               |main.js
               |manifest.json
               |style.css
 
 
 
-3. 打开obsidian，在第三方插件中开启 `obshugo`
+3. 打开obsidian，在第三方插件中开启 `hugo-helper`
 
 
 # 如何Debug？
