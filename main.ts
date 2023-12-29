@@ -37,6 +37,7 @@ const DEFAULT_SETTINGS: ObsHugoSettings = {
 
 export default class MyPlugin extends Plugin {
 	settings: ObsHugoSettings;
+
 	/**
 	 * 更新选中文档的最新修改日期、标题和分类，其中分类是通过切割所在路径后、排除根目录和最底层文件夹名称得到的。
 	 * 排除最底层文件夹是因为所有的文档都以 index.md 存储，
@@ -70,6 +71,7 @@ export default class MyPlugin extends Plugin {
 			// this.app.vault.rename(activeFile, newPath);
 		});
 	}
+
 	/**
 	 * 更新单个属性
 	 * @param file
@@ -162,34 +164,14 @@ export default class MyPlugin extends Plugin {
 		this.registerEvent(
 			this.app.workspace.on("file-menu", (menu, file) => {
 				// 判断该目录是否可以创建帖子（content/posts直接子目录以及所有的分类目录下都可以创建帖子。
-				if(!this.isPostsFolder(file)) return;
+				if (!this.isPostsFolder(file)) return;
 
 				menu.addItem((item) => {
 					item
 						.setTitle("hugo:新建帖子")
-						.setIcon("document")
+						.setIcon("file-plus-2")
 						.onClick(async () => {
-							new Notice(file.path);
-							const ask = new AskModal(this.app, async (titleName) => {
-								// new Notice(`Hello, ${result}`)
-								if (file instanceof TFile) {
-									console.log("It's a file!");
-								} else if (file instanceof TFolder) {
-									console.log("It's a folder!");
-									// 当前目录下创建文件夹
-									file.vault.createFolder(file.path + "/" + titleName);
-									// 创建index.zh-cn.md
-									const path = file.path + "/" + titleName + "/" + "index.zh-cn.md";
-									await file.vault.create(path, "").then((f) => {
-										new Notice("文档创建成功！")
-										this.insertTemplate(f);
-									});
-								}
-								// this.app.vault.createFolder(result)
-							})
-							ask.setTitle("输入帖子名称")
-							ask.setOldValue("untitled")
-							ask.open();
+							this.newPosts(file);
 						});
 				});
 			})
@@ -198,7 +180,7 @@ export default class MyPlugin extends Plugin {
 		this.registerEvent(
 			this.app.workspace.on("file-menu", (menu, file) => {
 				if (!this.isPostsFolder(file)) return;// 如果不是分类文件夹，不可修改
-				menu.addItem((item)=> {
+				menu.addItem((item) => {
 					item.setTitle("hugo:添加分类").setIcon("document").onClick(async () => {
 						const ask = new AskModal(this.app, async (newCategoryName) => {
 							this.app.vault.createFolder(file.path + "/" + newCategoryName);
@@ -343,9 +325,11 @@ export default class MyPlugin extends Plugin {
 		// 	new SeriesleModal(this.app, this.getSeries()).open();
 		// 		//async (result) => new Notice(`Hello, ${result.title}!`)).open();
 		// });
-		this.addRibbonIcon("info",
-			"修改链接名称",
+		this.addRibbonIcon("file-plus-2",
+			"hugo:新建帖子",
 			async () => {
+				const tf = this.app.vault.getAbstractFileByPath(this.settings.postPath)
+				if (tf instanceof TFolder) this.newPosts(tf)
 			}
 		);
 
@@ -366,7 +350,7 @@ export default class MyPlugin extends Plugin {
 				clearTimeout(timeoutId);
 				// 设置新的定时器，在输入停止后的 2000 毫秒执行操作
 				// 延迟触发函数
-				timeoutId = setTimeout(function() {
+				timeoutId = setTimeout(function () {
 					// 在这里执行你的操作
 					console.log('用户停止输入了，现在可以执行相关操作');
 					callBySystem = true;
@@ -374,7 +358,7 @@ export default class MyPlugin extends Plugin {
 					// 但是判断到callBySystem时，会跳过这次修改, 然后将callBySystem修改为false，又继续正常监听用户输入。
 					context.updateMetaOne(file, 'lastmod',
 						moment(file?.stat.mtime).format(context.settings.momentDateFormat)); // 修改最近更新时间)
-				}, Number(context.settings.timeout)*1000);
+				}, Number(context.settings.timeout) * 1000);
 
 			} else callBySystem = false;
 
@@ -384,16 +368,6 @@ export default class MyPlugin extends Plugin {
 			console.log("cm!!!");
 		}))
 
-		// let orig_fn = this.app.workspace.editorSuggest.suggests[0].selectSuggestion;
-		// this.app.workspace.editorSuggest.suggests[0].selectSuggestion =
-		// 	function (value, evt) {
-		// 		value.file.basename = value.file.parent.name;
-		// 		console.log(value);
-		// 		orig_fn.apply(this, [value, evt]);
-		// 	}
-
-		// Perform additional things with the ribbon
-		// ribbonIconEl.addClass('my-plugin-ribbon-class');
 
 		// This adds a status bar item to the bottom of the app. Does not work on mobile apps.
 		const statusBarItemEl = this.addStatusBarItem();
@@ -449,6 +423,35 @@ export default class MyPlugin extends Plugin {
 		this.registerInterval(window.setInterval(() => console.log('setInterval'), 5 * 60 * 1000));
 	}
 
+	/**
+	 * 指定位置新建帖子
+	 * @param file
+	 * @private
+	 */
+	private newPosts(file: TAbstractFile | TFolder) {
+		new Notice(file.path);
+		const ask = new AskModal(this.app, async (titleName) => {
+			// new Notice(`Hello, ${result}`)
+			if (file instanceof TFile) {
+				console.log("It's a file!");
+			} else if (file instanceof TFolder) {
+				console.log("It's a folder!");
+				// 当前目录下创建文件夹
+				file.vault.createFolder(file.path + "/" + titleName);
+				// 创建index.zh-cn.md
+				const path = file.path + "/" + titleName + "/" + "index.zh-cn.md";
+				await file.vault.create(path, "").then((f) => {
+					new Notice("文档创建成功！")
+					this.insertTemplate(f);
+				});
+			}
+			// this.app.vault.createFolder(result)
+		})
+		ask.setTitle("输入帖子名称")
+		ask.setOldValue("untitled")
+		ask.open();
+	}
+
 	onunload() {
 	}
 
@@ -467,7 +470,7 @@ export default class MyPlugin extends Plugin {
 	 * @param file
 	 * @return 是否为分类文件夹
 	 */
-	isCategoryFolder( file: TAbstractFile): boolean {
+	isCategoryFolder(file: TAbstractFile): boolean {
 		if (file == null) return false;
 		if (file instanceof TFile) return false;
 		if (file instanceof TFolder) {
@@ -477,10 +480,10 @@ export default class MyPlugin extends Plugin {
 			if (file.path == this.settings.postPath) return false;
 			// 一级目录下包含.md文件的文件夹，不是分类文件夹，而是文档标题
 			const items = file.children;
-			for(let i= 0 ;i < items.length; i++) {
+			for (let i = 0; i < items.length; i++) {
 				const item = items[i];
 				// 判断包含了md文件，返回false
-				if((item instanceof TFile) && item.extension == "md") return false;
+				if ((item instanceof TFile) && item.extension == "md") return false;
 			}
 		}
 		return true;
@@ -493,7 +496,7 @@ export default class MyPlugin extends Plugin {
 	 * @param file
 	 */
 	isPostsFolder(file: TAbstractFile): boolean {
-		if (file instanceof TFolder && file.path == this.settings.postPath)  return true;
+		if (file instanceof TFolder && file.path == this.settings.postPath) return true;
 		return this.isCategoryFolder(file);
 	}
 }
@@ -503,7 +506,6 @@ interface Series {
 	title: string;
 	description: string;
 }
-
 
 
 export class SeriesModal extends SuggestModal<Series> {
@@ -596,18 +598,18 @@ class SampleSettingTab extends PluginSettingTab {
 				.setPlaceholder('4')
 				.setValue(this.plugin.settings.timeout)
 				.onChange(async (value) => {
-					if (Number(value) < 2 || Number(value)> 60) {
+					if (Number(value) < 2 || Number(value) > 60) {
 						new Notice("无效设置")
 						return;
 					}
 					this.plugin.settings.timeout = value;
 					await this.plugin.saveSettings();
-				})).addToggle(toggle=> {
-					toggle.setValue(this.plugin.settings.toggleAutoUpdateLastMod)
-						.onChange(async value => {
-							this.plugin.settings.toggleAutoUpdateLastMod = value;
-							await this.plugin.saveSettings();
-						})
+				})).addToggle(toggle => {
+			toggle.setValue(this.plugin.settings.toggleAutoUpdateLastMod)
+				.onChange(async value => {
+					this.plugin.settings.toggleAutoUpdateLastMod = value;
+					await this.plugin.saveSettings();
+				})
 		});
 
 		new Setting(containerEl)
@@ -631,7 +633,7 @@ class SampleSettingTab extends PluginSettingTab {
 				.setPlaceholder('content/posts')
 				.setValue(this.plugin.settings.momentDateFormat)
 				.onChange(async (value) => {
-					this.plugin.settings.momentDateFormat= value;
+					this.plugin.settings.momentDateFormat = value;
 					await this.plugin.saveSettings();
 				}));
 	}
