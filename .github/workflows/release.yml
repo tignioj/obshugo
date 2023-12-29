@@ -1,10 +1,8 @@
-name: Release Obsidian plugin
-
+name: Release Obsidian plugin - hugo helper
 on:
     push:
         tags:
             - "*"
-
 jobs:
     build:
         runs-on: ubuntu-latest
