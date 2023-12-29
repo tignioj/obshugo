@@ -25,7 +25,7 @@ export class AskModal extends Modal {
         contentEl.createEl("h1", {text: this.title});
 
         new Setting(contentEl)
-            .setName("Name")
+            .setName("标题")
             .addText((text) => {
 				text.setValue(this.oldValue)
                 this.result=this.oldValue // 当用户没有输入的时候，result为空，所以先赋值

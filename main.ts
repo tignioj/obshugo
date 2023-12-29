@@ -128,15 +128,15 @@ export default class MyPlugin extends Plugin {
 	async onload() {
 		await this.loadSettings();
 
-		// 文件：新建帖子
+		// 文件：新建文章
 		this.registerEvent(
 			this.app.workspace.on("file-menu", (menu, file) => {
-				// 判断该目录是否可以创建帖子（content/posts直接子目录以及所有的分类目录下都可以创建帖子。
+				// 判断该目录是否可以创建文章（content/posts直接子目录以及所有的分类目录下都可以创建文章。
 				if (!this.isPostsFolder(file)) return;
 
 				menu.addItem((item) => {
 					item
-						.setTitle("hugo:新建帖子")
+						.setTitle("hugo:新建文章")
 						.setIcon("file-plus-2")
 						.onClick(async () => {
 							this.newPosts(file);
@@ -189,7 +189,7 @@ export default class MyPlugin extends Plugin {
 		);
 
 		this.addRibbonIcon("file-plus-2",
-			"hugo:新建帖子",
+			"hugo:新建文章",
 			async () => {
 				const tf = this.app.vault.getAbstractFileByPath(this.settings.postPath)
 				if (tf instanceof TFolder) this.newPosts(tf)
@@ -249,7 +249,7 @@ export default class MyPlugin extends Plugin {
 	}
 
 	/**
-	 * 指定位置新建帖子
+	 * 指定位置新建文章
 	 * @param file
 	 * @private
 	 */
@@ -261,7 +261,7 @@ export default class MyPlugin extends Plugin {
 				// 检测目录是否已经存在，存在则报错
 				const exf = this.app.vault.getAbstractFileByPath(file.path + "/" + titleName)
 				if (exf instanceof TFolder) {
-					new Notice("已经存在同名目录，请重新设置帖子标题")
+					new Notice("已经存在同名目录，请重新设置文章标题")
 					return
 				}
 				// 当前目录下创建文件夹
@@ -269,13 +269,13 @@ export default class MyPlugin extends Plugin {
 				// 创建index.zh-cn.md
 				const path = file.path + "/" + titleName + "/" + "index.zh-cn.md";
 				await file.vault.create(path, "").then((f) => {
-					new Notice("文档创建成功！")
+					new Notice("文章创建成功！")
 					this.insertTemplate(f);
 				});
 			}
 			// this.app.vault.createFolder(result)
 		})
-		ask.setTitle("输入帖子名称")
+		ask.setTitle("输入文章标题")
 		const defaultTitle = moment(new Date()).format("Y-MM-dd-HHmmss")
 		ask.setOldValue(defaultTitle)
 		ask.open();
@@ -319,9 +319,9 @@ export default class MyPlugin extends Plugin {
 	}
 
 	/**
-	 * 判读是否可以新建帖子
-	 * content/posts目录下可以新建帖子
-	 * 所有categories目录下都可以新建帖子。
+	 * 判读是否可以新建文章
+	 * content/posts目录下可以新建文章
+	 * 所有categories目录下都可以新建文章。
 	 * @param file
 	 */
 	isPostsFolder(file: TAbstractFile): boolean {
