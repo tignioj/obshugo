@@ -7,10 +7,9 @@ import {
 	Setting,
 	SuggestModal,
 	TFolder, TAbstractFile,
+	moment
 } from 'obsidian';
 import {AskModal} from "./AskModal";
-
-import moment from "moment";
 
 // 常量配置
 // 文档目录
