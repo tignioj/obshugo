@@ -11,6 +11,7 @@ import {
 } from 'obsidian';
 import {AskModal} from "./AskModal";
 
+
 // 常量配置
 // 文档目录
 interface ObsHugoSettings {
@@ -19,6 +20,7 @@ interface ObsHugoSettings {
 	toggleAutoCategories: true; // TODO：自动分类开关
 	postPath: string;
 	timeout: string;
+	templatePath: string;
 }
 
 const DEFAULT_SETTINGS: ObsHugoSettings = {
@@ -27,6 +29,7 @@ const DEFAULT_SETTINGS: ObsHugoSettings = {
 	toggleAutoCategories: true, // 自动分类
 	postPath: "content/posts",
 	timeout: '5', // 停止输入后多少秒更新lastmod属性
+	templatePath: ''
 }
 
 /**
@@ -37,7 +40,7 @@ const DEFAULT_SETTINGS: ObsHugoSettings = {
  * @param activeFile 选中的文件
  * @returns
  */
-async function updateMeta(settings: ObsHugoSettings,activeFile: TAbstractFile) {
+async function updateMeta(settings: ObsHugoSettings, activeFile: TAbstractFile) {
 	if (!(activeFile instanceof TFile)) return;
 	await this.app.fileManager.processFrontMatter(activeFile,
 		(frontMatter: any) => {
@@ -60,9 +63,11 @@ async function updateMeta(settings: ObsHugoSettings,activeFile: TAbstractFile) {
 		// this.app.vault.rename(activeFile, newPath);
 	});
 }
+
 function getCategory(file: TFile) {
 	return file.path.split("/").slice(2, -2)
 }
+
 /**
  * 更新单个属性
  * @param file
@@ -74,7 +79,7 @@ async function updateMetaOne(file: TAbstractFile, key: string, value: any) {
 	// @ts-ignore
 	// 由于deleted是被动态赋值的，但是编译时候是无法检测到deleted属性，
 	// 因此应该使用@ts-ignore注解跳过检查
-	if(file['deleted']) {
+	if (file['deleted']) {
 		// console.log("文档已经被删除，无法修改!", file)
 		return
 	}
@@ -88,6 +93,7 @@ async function updateMetaOne(file: TAbstractFile, key: string, value: any) {
 
 export default class MyPlugin extends Plugin {
 	settings: ObsHugoSettings;
+
 	/**
 	 * 插入模板
 	 * @param activeFile
@@ -97,19 +103,61 @@ export default class MyPlugin extends Plugin {
 			new Notice("请选中文件以更新属性");
 			return;
 		}
+
 		await this.app.fileManager.processFrontMatter(activeFile,
 			(frontMatter) => {
 				// console.log(frontMatter);
-				frontMatter["date"] = moment(activeFile?.stat.ctime).format(this.settings.momentDateFormat); // 创建日期
-				frontMatter["lastmod"] = moment(activeFile?.stat.mtime).format(this.settings.momentDateFormat); // 修改最近更新时间
-				frontMatter["categories"] = activeFile.path.split("/").slice(2, -2); // 分类
-				frontMatter["title"] = activeFile.parent?.name // 标题
-				frontMatter["draft"] = "true"
-				frontMatter["tags"] = [];
-				frontMatter["series"] = [];
-				// 系列
-				//let series = this.app.vault.getAbstractFileByPath("content/series").children
-			});
+				const keys = Object.keys(frontMatter)
+
+				// js执行可使用的context
+				const context = {
+					title: activeFile.parent?.name,
+				}
+				for (let i = 0; i < keys.length; i++) {
+					const key = keys[i];
+					const value = frontMatter[key]
+
+					// title已经在创建目录的时候被解析，所以直接用父目录名称即可，无需再次解析否则会出错。
+					if (key == "title") {
+						frontMatter[key] = activeFile.parent?.name
+					} else frontMatter[key] = this.parseValue(value, context);
+				}
+			})
+	}
+
+	/**
+	 * 解析属性值，
+	 * 	是js:则执行js并返回结果
+	 * 	不是js:直接返回value
+	 * @param value
+	 * @param context js可以调用的上下文
+	 */
+	parseValue(value: any, context: object) {
+		if (typeof (value) === "string" && value.startsWith("{{") && value.endsWith("}}")) {
+			const script = value.substring(2, value.length - 2)
+			// https://esbuild.github.io/content-types/#direct-eval
+			// 避免直接调用eval，用Function代替。其中第一个参数是script中将要访问的变量名称，第二个参数是脚本代码，后面括号的参数是传递给context变量的。
+			return String((new Function('context', 'return ' + script))(context))
+		} else return value;
+	}
+
+	/**
+	 * 插入默认模板
+	 * @param activeFile
+	 */
+	async insertDefaultTemplate(activeFile: TFile) {
+		if (!activeFile) return;
+		await this.app.fileManager.processFrontMatter(activeFile, (frontMatter) => {
+			frontMatter["date"] = moment(activeFile?.stat.ctime).format(this.settings.momentDateFormat); // 创建日期
+			frontMatter["lastmod"] = moment(activeFile?.stat.mtime).format(this.settings.momentDateFormat); // 修改最近更新时间
+			frontMatter["categories"] = activeFile.path.split("/").slice(2, -2); // 分类
+			frontMatter["title"] = activeFile.parent?.name // 标题
+			frontMatter["draft"] = "true"
+			frontMatter["tags"] = [];
+			frontMatter["series"] = [];
+			// 系列
+			//let series = this.app.vault.getAbstractFileByPath("content/series").children
+		})
 	}
 
 	/**
@@ -144,7 +192,7 @@ export default class MyPlugin extends Plugin {
 						.setTitle("hugo:新建文章")
 						.setIcon("file-plus-2")
 						.onClick(async () => {
-							this.newPosts(file);
+							await this.newPosts(file);
 						});
 				});
 			})
@@ -158,7 +206,7 @@ export default class MyPlugin extends Plugin {
 						.setIcon("info")
 						.onClick(async () => {
 							if (view && view.file instanceof TFile) {
-								updateMeta(this.settings,view.file)
+								await updateMeta(this.settings, view.file)
 								// 改名字
 							} else new Notice("未选中文档");
 						});
@@ -206,7 +254,8 @@ export default class MyPlugin extends Plugin {
 
 		// 检测到文档移动
 		this.registerEvent(this.app.vault.on("rename", file => {
-			// console.log("rename",file.path);
+			// 不检测非文档目录
+			if (!file.path.startsWith(this.settings.postPath)) return;
 			if (file instanceof TFile && file.name.endsWith("md")) {
 				updateMeta(this.settings, file);
 			}
@@ -217,9 +266,9 @@ export default class MyPlugin extends Plugin {
 		let timeoutId: ReturnType<typeof setTimeout>;
 		let callBySystem = false; // 系统的修改lastmod标志
 		this.registerEvent(this.app.vault.on("modify", (file) => {
+			const settings = this.settings;
 			if (!this.settings.toggleAutoUpdateLastMod) return; // 是否开启自动更新lastmod
 			if (!file.path.startsWith(this.settings.postPath)) return;
-			const context = this;
 			if (file instanceof TFile && !callBySystem) { // 非系统触发的修改:即用户触发的修改
 				// 清除之前的定时器
 				clearTimeout(timeoutId);
@@ -232,8 +281,8 @@ export default class MyPlugin extends Plugin {
 					// 执行修改后，callBySystem一定会变成true, 这次的修改事件会被监听到，
 					// 但是判断到callBySystem时，会跳过这次修改, 然后将callBySystem修改为false，又继续正常监听用户输入。
 					updateMetaOne(file, 'lastmod',
-						moment(file?.stat.mtime).format(context.settings.momentDateFormat)); // 修改最近更新时间)
-				}, Number(context.settings.timeout) * 1000 /*延迟多少毫秒执行*/);
+						moment(file?.stat.mtime).format(settings.momentDateFormat)); // 修改最近更新时间)
+				}, Number(settings.timeout) * 1000 /*延迟多少毫秒执行*/);
 
 			} else callBySystem = false;
 
@@ -246,35 +295,89 @@ export default class MyPlugin extends Plugin {
 	}
 
 	/**
+	 * 获取模板内容
+	 */
+	async getTemplateContent() {
+		const tp = this.app.vault.getAbstractFileByPath(this.settings.templatePath)
+		if (tp instanceof TFile) {
+			const template_content = await this.app.vault.read(
+				tp as TFile
+			);
+			// console.log(template_content)
+			return template_content;
+		}
+		return "";
+	}
+
+	/**
+	 * 获取模板中的属性值
+	 * @param key
+	 */
+	async getTemplateMetaValue(key: string) {
+		const file = this.app.vault.getAbstractFileByPath(this.settings.templatePath)
+		let value = ""
+		if (file instanceof TFile && file.extension == "md") {
+			await this.app.fileManager.processFrontMatter(file, (frontMatter) => {
+				if (frontMatter[key]) value = frontMatter[key]
+			})
+		}
+		return value
+	}
+
+	/**
 	 * 指定位置新建文章
-	 * @param file
+	 * @param file 文章将要创建的目录
 	 * @private
 	 */
-	private newPosts(file: TAbstractFile | TFolder) {
+	async newPosts(file: TAbstractFile) {
 		new Notice(file.path);
+
+		// 读取模板标题
+		const templateTitle = await this.getTemplateMetaValue("title")
+		// 标题显示在modal输入框
+		// 如果是固定字符串，直接显示
+		// 如果是js，则显示默认标题
+		// 输入确定后，获取到新标题名称
+		// 解析标题名称
 		const ask = new AskModal(this.app, async (titleName) => {
-			// new Notice(`Hello, ${result}`)
+
+			// 解析模板标题
+			let finalTitle = ""
+			const context = {title: titleName} // script可以访问的context
+			const titleValue = await this.getTemplateMetaValue("title")
+			// 如果是需要解析的标题，则返回解析后的结果
+			if (titleValue.startsWith("{{") && titleValue.endsWith("}}")) finalTitle = this.parseValue(titleValue, context)
+			// 如果是固定的标题，则返回用户输入后的标题
+			else finalTitle = titleName
+
 			if (file instanceof TFolder) {
 				// 检测目录是否已经存在，存在则报错
-				const exf = this.app.vault.getAbstractFileByPath(file.path + "/" + titleName)
+				const exf = this.app.vault.getAbstractFileByPath(file.path + "/" + finalTitle)
 				if (exf instanceof TFolder) {
 					new Notice("已经存在同名目录，请重新设置文章标题")
 					return
 				}
 				// 当前目录下创建文件夹
-				file.vault.createFolder(file.path + "/" + titleName);
-				// 创建index.zh-cn.md
-				const path = file.path + "/" + titleName + "/" + "index.zh-cn.md";
-				await file.vault.create(path, "").then((f) => {
-					new Notice("文章创建成功！")
-					this.insertTemplate(f);
-				});
+				try {
+					await file.vault.createFolder(file.path + "/" + finalTitle);
+					// 创建index.zh-cn.md
+					const path = file.path + "/" + finalTitle + "/" + "index.zh-cn.md";
+					const templateContent = await this.getTemplateContent();
+					await file.vault.create(path, templateContent).then((f) => {
+						new Notice("文章创建成功！")
+						// 插入模板
+						if (templateContent.trim().length > 0) this.insertTemplate(f);
+						else this.insertDefaultTemplate(f);
+					});
+				} catch (e) {
+					new Notice("新建文章出错:" + e)
+				}
 			}
 			// this.app.vault.createFolder(result)
 		})
 		ask.setTitle("输入文章标题")
 		const defaultTitle = moment(new Date()).format("Y-MM-DD-HHmmss")
-		ask.setOldValue(defaultTitle)
+		ask.setOldValue((templateTitle.length == 0 || templateTitle.startsWith("{{")) ? defaultTitle : templateTitle)
 		ask.open();
 	}
 
@@ -328,7 +431,6 @@ export default class MyPlugin extends Plugin {
 }
 
 
-
 interface Series {
 	title: string;
 	description: string;
@@ -368,7 +470,7 @@ export class SeriesModal extends SuggestModal<Series> {
 		if (!activeFile) {
 			return;
 		}
-		await updateMetaOne(activeFile,"series", [series.title]);
+		await updateMetaOne(activeFile, "series", [series.title]);
 	}
 }
 
@@ -387,7 +489,7 @@ class SampleSettingTab extends PluginSettingTab {
 		containerEl.empty();
 
 		new Setting(containerEl)
-			.setName('自动更新')
+			.setName('自动更新lastmod属性')
 			.setDesc('停止输入后多少秒自动更新lastmod，不建议设置太低否则会频繁触发合并事件，允许范围2~60')
 			.addText(text => text
 				.setPlaceholder('4')
@@ -422,13 +524,25 @@ class SampleSettingTab extends PluginSettingTab {
 				}));
 
 		new Setting(containerEl)
-			.setName('日期格式')
-			.setDesc('采用momentjs, 默认ISO8601，更多格式请查看文档 https://momentjscom.readthedocs.io/en/latest/moment/04-displaying/01-format/')
+			.setName('模板日期格式')
+			.setDesc('默认模板的date,lastmod属性都会用到这个格式，以及文章的\'更新属性\'功能也会基于此格式更新。采用momentjs, 默认ISO8601，更多格式请查看文档 https://momentjscom.readthedocs.io/en/latest/moment/04-displaying/01-format/')
 			.addText(text => text
-				.setPlaceholder('content/posts')
+				.setPlaceholder('YYYY-MM-DDTHH:mm:ssZ')
 				.setValue(this.plugin.settings.momentDateFormat)
 				.onChange(async (value) => {
 					this.plugin.settings.momentDateFormat = value;
+					await this.plugin.saveSettings();
+				}));
+
+		new Setting(containerEl)
+			.setName('自定义模板路径')
+			.setDesc('仅文档属性的值支持解析js: 当用属性值用双花括号包围时，括号内容将被识别为js脚本，例如 {{moment(new Date()).format("YYYYMMDD")}} 将生成指定格式的时间20231230,' +
+				'{{context.title}}将解析为文档的标题(md文章的父目录名称即为标题); 若要使用字符串拼接请在花括号内完成; 此选项留白或者文档路径错误时，将使用默认模板; 路径示例：template/HugoTemplate.md')
+			.addText(text => text
+				.setPlaceholder('')
+				.setValue(this.plugin.settings.templatePath)
+				.onChange(async (value) => {
+					this.plugin.settings.templatePath = value;
 					await this.plugin.saveSettings();
 				}));
 	}

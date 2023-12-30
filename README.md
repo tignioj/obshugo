@@ -9,7 +9,6 @@
 - 快捷添加文档
 
 # 功能1：文档的创建
-//TODO 自定义模板
 ## 创建方式一：指定目录下右键新建
 - 在content/posts的子目录下，右键新建打开菜单，选择`hugo:新建帖子`，会弹框让你输入标题，输入完成后确认，会自动根据固定模板创建一篇空白文档。
 - 仅在指定目录下生效, 你可以在设置中修改帖子存放路径（根据你的hugo设置而定，不建议随便修改)。
@@ -17,16 +16,41 @@
 - 默认在content/posts下生成帖子
 - 新建帖子的名称，不可有同名称的目录在content/posts下，否则会创建失败
 
+## 自定义模板
+在设置中指定模板路径即可，默认模板
+```yaml
+---
+title: "{{context.title}}"
+date: "{{moment(new Date()).format('YYYY-MM-DDTHH:mm:ssZ')}}"
+draft: "false"
+tags: 
+lastmod: "{{moment(new Date()).format('YYYY-MM-DDTHH:mm:ssZ')}}"
+categories: 
+description: 
+series:
+---
+```
+有关日期格式请查阅[momentjs官网](https://momentjs.com/)
+### 注意：
+- 属性值内容若是由`{{}}`包裹，括号里的内容会被识别为js解析。如果要组合字符串，不要用`字符串+{{}}`结构, 而是 `{{'字符串'+ js }}`的结构
+  - 例如 `{{"现在时间是" +moment(new Date()).format('HH:mm:ss')}}`会解析为`现在时间是13:16:02`
+  - 例如 `现在时间是{{moment(new Date()).format('HH:mm:ss')}}`会解析错误
+
+- 特殊属性`title`: 执行`hugo:新建文章`操作，弹窗标题输入的内容可以通过 `{{context.title}}`读取
+  - 举例：`{{"数据库-" + context.title}}`，假设输入框中输入内容为`Day1`, 则生成文章标题为`数据库-Day1`
+  - 若title留白，则默认和 {{context.title}}效果相同，即输入什么标题就生成相应的文档。
+  - 若title为固定值，则执行`hugo:新建文章`操作时，弹窗输入的标题会覆盖模板中的固定标题
+
 # 功能2：分类文件夹的操作
 ## 注意：
 1. 仅content/posts目录下新建的文件夹被视作分类文件夹
-	- 例如 /content/posts/Linux， 则Linux被视作一种分类
-	- 例如 /content/posts/Linux/Ubuntu， 则Linux,Ubuntu分别被视作一种分类
+	- 例如 content/posts/Linux， 则Linux被视作一种分类
+	- 例如 content/posts/Linux/Ubuntu， 则Linux,Ubuntu分别被视作一种分类
 2. 当分类文件夹的直接子目录（就是第一层子目录）包含.md文件，则不被视为分类文件夹，而是文档的标题
-   - 例如 /content/posts/Linux/Ubuntu/Ubuntu开启Samba/index.zh-cn.md (注意obsidian不会显示md拓展名称), 则`Linux`, `Ubuntu`是分类文件夹，而`Ubuntu开启Samba`由于子目录含有md文件，则不被视作分类文件夹。
+   - 例如 content/posts/Linux/Ubuntu/Ubuntu开启Samba/index.zh-cn.md (注意obsidian不会显示md拓展名称), 则`Linux`, `Ubuntu`是分类文件夹，而`Ubuntu开启Samba`由于子目录含有md文件，则不被视作分类文件夹。
 3. 分类文件夹的名称会被自动写入到md文件的index.zh-cn.md文档的`categories`属性当中，作为文档的分类
 
-## 分类文件夹的
+## 分类文件夹
 - 创建: 右键content/posts的子目录下，右键`新建文件夹`
 - 修改: 右键content/posts下选中分类目录，右键`重命名`
 - 移动: 你可以将分类文件夹移动到content/posts下的任意目录（除了帖子目录，即index.md的同级目录）
@@ -68,12 +92,12 @@ title: Ubuntu安装Samba
 其中
 - `lastmod`: 基于文档的最后修改时间，格式化为ISO 8061标准时间
 - `categories`: 基于文档所在路径，对路径进行切割，排除掉根目录和文档所在的目录后，得到的数组
-  - 请不要直接修改该值，通过重命名分类文件夹或者移动文档路径后，该值会被自动重新赋值。
+  - 请不要直接修改该值，重命名分类文件夹或者移动文档路径后，该值会被自动重新赋值。
 - `title`: 文档名称，基于父目录的名称。因为文档本身的名称需要用来标识何种语言的文档，因此md文件不能用文档标题作为名称。
 
 > 注意：文档变更目录时，应当移动.md的父目录（也就是标题目录)，移动到新的分类文件夹后，会自动修改categories为新的值
 
-# 功能4：文档也有连续剧--系列
+# 功能4：文章系列
 写博客的时候，除了分类、标签以外，觉得分类还是不太够，比如一些连贯的文章仅仅是靠标签和分类是不够的，因此加入了“系列”的功能。
 我不清楚他内部是怎么实现的，但是我们要用它的方法，只需要做到以下几点。
 ### 1. 创建系列：结构为 `series/[系列名称]/index_xx.md`
@@ -137,9 +161,10 @@ series:
 ---
 ```
 
-## 修改系列
+## 修改系列存在的问题
 这时候同样的问题来了，每次我们创建系列的时候，还要手动复制粘贴，太麻烦，不如弄个按钮点击后，自动遍历 series/下的所有名称，然后呈现一个带搜索框的列表，点击后就直接插入到我们的文档中，岂不美哉？
-### 如何修改：打开md文档，对着打开的文档窗口，右键选择`hogo:修改系列`，会自动遍历你在series下创建的系列，选择后，文档的series会自动修改。
+## 改进后的修改系列
+打开md文档，对着打开的文档窗口，右键选择`hogo:修改系列`，会自动遍历你在series下创建的系列，选择后，文档的series属性会自动修改。
 
 
 # 功能5：发布帖子
