@@ -5,16 +5,16 @@
   - 修改文档后的几秒内，自动修改lastmod
   - 标题与目录同步: 当我们需要修改文档标题时，只需要修改目录，title字段会同步更新
   - 移动文档位置后，自动修改categories
-  - 修改分类名称时，帖子相应字段改变
+  - 修改分类名称时，文档相应字段改变
 - 快捷添加文档
 
 # 功能1：文档的创建
 ## 创建方式一：指定目录下右键新建
-- 在content/posts的子目录下，右键新建打开菜单，选择`hugo:新建帖子`，会弹框让你输入标题，输入完成后确认，会自动根据固定模板创建一篇空白文档。
-- 仅在指定目录下生效, 你可以在设置中修改帖子存放路径（根据你的hugo设置而定，不建议随便修改)。
-## 创建方式二：侧边栏按钮点击`hugo:新建帖子`按钮
-- 默认在content/posts下生成帖子
-- 新建帖子的名称，不可有同名称的目录在content/posts下，否则会创建失败
+- 在content/posts的子目录下，右键新建打开菜单，选择`hugo:新建文章`，会弹框让你输入标题，输入完成后确认，会自动根据固定模板创建一篇空白文档。
+- 仅在指定目录下生效, 你可以在设置中修改文章存放路径（根据你的hugo设置而定，不建议随便修改)。
+## 创建方式二：侧边栏按钮点击`hugo:新建文章`按钮
+- 默认在`content/posts`下生成文章(可在设置中修改)
+- 新建文章的名称，不可有同名称的目录在`content/posts`下，否则会创建失败
 
 ## 自定义模板
 在设置中指定模板路径即可，默认模板
@@ -38,12 +38,12 @@ series:
 
 - 特殊属性`title`: 执行`hugo:新建文章`操作，弹窗标题输入的内容可以通过 `{{context.title}}`读取
   - 举例：`{{"数据库-" + context.title}}`，假设输入框中输入内容为`Day1`, 则生成文章标题为`数据库-Day1`
-  - 若title留白，则默认和 {{context.title}}效果相同，即输入什么标题就生成相应的文档。
-  - 若title为固定值，则执行`hugo:新建文章`操作时，弹窗输入的标题会覆盖模板中的固定标题
+  - 若模板中的`title`留白，则默认和 {{context.title}}效果相同，即输入什么标题就生成相应的文档。
+  - 若模板中的`title`为固定值，则执行`hugo:新建文章`操作时，弹窗输入的标题会覆盖模板中的固定标题
 
 # 功能2：分类文件夹的操作
 ## 注意：
-1. 仅content/posts目录下新建的文件夹被视作分类文件夹
+1. 仅content/posts目录下新建的文件夹被视作分类文件夹(可在设置中修改)
 	- 例如 content/posts/Linux， 则Linux被视作一种分类
 	- 例如 content/posts/Linux/Ubuntu， 则Linux,Ubuntu分别被视作一种分类
 2. 当分类文件夹的直接子目录（就是第一层子目录）包含.md文件，则不被视为分类文件夹，而是文档的标题
@@ -53,7 +53,7 @@ series:
 ## 分类文件夹
 - 创建: 右键content/posts的子目录下，右键`新建文件夹`
 - 修改: 右键content/posts下选中分类目录，右键`重命名`
-- 移动: 你可以将分类文件夹移动到content/posts下的任意目录（除了帖子目录，即index.md的同级目录）
+- 移动: 你可以将分类文件夹移动到content/posts下的任意目录（除了文章目录，即index.md的同级目录）
 - 删除:右键直接删除即可
 > 使用obsidian自带的`重命名`后，子目录下的所有文档路径会被检测到改变,自动更新该md文件内部的`categories`为修改后的分类(文件夹)名称。
 
@@ -164,12 +164,12 @@ series:
 ## 修改系列存在的问题
 这时候同样的问题来了，每次我们创建系列的时候，还要手动复制粘贴，太麻烦，不如弄个按钮点击后，自动遍历 series/下的所有名称，然后呈现一个带搜索框的列表，点击后就直接插入到我们的文档中，岂不美哉？
 ## 改进后的修改系列
-打开md文档，对着打开的文档窗口，右键选择`hogo:修改系列`，会自动遍历你在series下创建的系列，选择后，文档的series属性会自动修改。
+打开md文档，对着打开的文档窗口，右键选择`hogo:选择系列`，会自动遍历你在series下创建的系列，选择后，文档的series属性会自动修改。
 
 
-# 功能5：发布帖子
-//TODO 实现发布帖子。
-- 暂时先用其他插件执行git命令发布帖子，这里推荐[shell command](https://github.com/Taitava/obsidian-shellcommands)插件, 安装完成后，填写一下几条命令基本上没问题了
+# 功能5：发布文档
+//TODO 实现发布文档。
+- 暂时先用其他插件执行git命令发布文档，这里推荐[shell command](https://github.com/Taitava/obsidian-shellcommands)插件, 安装完成后，填写一下几条命令基本上没问题了
 ```shell
 git add {{folder_path:relative}}
 git commit -m "{{folder_name}}"
@@ -210,12 +210,12 @@ mkdir -p .obsidian/plugins/hugo-helper/
 
 
 # 常见问题
-1. obsidian图片链接无法识别
+## 1. obsidian图片链接无法识别
    - 进入设置->文件与链接
    - 关掉Wiki链接
    - 内部链接类型设置为“基于当前笔记相对路径”
-2. hugo中md文档链接指向失效
-找到hugo配置文件 layouts/_default_markup/render-link.html，没有则自己创建文件夹和html文件，并输入以下内容到render-link.html，它会改变hugo对链接的渲染方式。
+## 2. hugo中md文章链接指向失效
+找到hugo配置文件 `layouts/_default_markup/render-link.html`，没有则自己创建文件夹和html文件，并输入以下内容到render-link.html，它会改变hugo对链接的渲染方式。
 说实话这部分我也不太懂。大概意思就是检测到url是.md结尾，就引用了某个资源。如果有人有更好的解决办法欢迎pr和issue。
 ```html
 {{- $url := urls.Parse .Destination -}}
