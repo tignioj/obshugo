@@ -91,7 +91,7 @@ async function updateMetaOne(file: TAbstractFile, key: string, value: any) {
 }
 
 
-export default class MyPlugin extends Plugin {
+export default class HugoHelperPlugin extends Plugin {
 	settings: ObsHugoSettings;
 
 	/**
@@ -290,7 +290,7 @@ export default class MyPlugin extends Plugin {
 
 
 		// This adds a settings tab so the user can configure various aspects of the plugin
-		this.addSettingTab(new SampleSettingTab(this.app, this));
+		this.addSettingTab(new HugoHelperSettingTab(this.app, this));
 
 	}
 
@@ -360,7 +360,8 @@ export default class MyPlugin extends Plugin {
 				// 当前目录下创建文件夹
 				try {
 					await file.vault.createFolder(file.path + "/" + finalTitle);
-					// 创建index.zh-cn.md
+					// 创建index.md
+					// TODO: 去掉zh-cn
 					const path = file.path + "/" + finalTitle + "/" + "index.zh-cn.md";
 					const templateContent = await this.getTemplateContent();
 					await file.vault.create(path, templateContent).then((f) => {
@@ -475,10 +476,10 @@ export class SeriesModal extends SuggestModal<Series> {
 }
 
 
-class SampleSettingTab extends PluginSettingTab {
-	plugin: MyPlugin;
+class HugoHelperSettingTab extends PluginSettingTab {
+	plugin: HugoHelperPlugin;
 
-	constructor(app: App, plugin: MyPlugin) {
+	constructor(app: App, plugin: HugoHelperPlugin) {
 		super(app, plugin);
 		this.plugin = plugin;
 	}
