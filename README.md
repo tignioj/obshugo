@@ -184,7 +184,7 @@ git push origin main
 mkdir -p .obsidian/plugins/hugo-helper/
 ``````
 
-2. 复制 `main.js`和`style.css`以及`manifest.json`四个文件到刚刚创建的目录下
+2. 复制 `main.js`和`style.css`以及`manifest.json`三个文件到刚刚创建的目录下
 
 
         |仓库
