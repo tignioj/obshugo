@@ -165,17 +165,18 @@ export default class HugoHelperPlugin extends Plugin {
 	 * @returns 获取系列，即content/series/下一级的所有目录名称。
 	 */
 	getSeries(): Series[] {
-
 		const folderOrFile = this.app.vault?.getAbstractFileByPath("content/series")
 		// 把TAbstractFile强制转换为TFolder对象,这样才能调用children。
-		const series = (<TFolder>folderOrFile)?.children
-
 		const arr = new Array<Series>();
-		series.forEach((item: any) => {
-			arr.push({title: item.name, description: item.name})
-		});
-		// console.log(arr)
+		if (folderOrFile instanceof TFolder) {
+			const series = folderOrFile.children
+			series.forEach((item: any) => {
+				arr.push({title: item.name, description: item.name})
+			});
+			// console.log(arr)
+		}
 		return arr;
+
 	}
 
 	async onload() {
@@ -263,18 +264,20 @@ export default class HugoHelperPlugin extends Plugin {
 
 
 		// 检测到文档修改就更新lastmod属性
-		let timeoutId: ReturnType<typeof setTimeout>;
+		let timeoutId: ReturnType<typeof Number>;
 		let callBySystem = false; // 系统的修改lastmod标志
 		this.registerEvent(this.app.vault.on("modify", (file) => {
 			const settings = this.settings;
 			if (!this.settings.toggleAutoUpdateLastMod) return; // 是否开启自动更新lastmod
 			if (!file.path.startsWith(this.settings.postPath)) return;
+			// callBySystem的作用：当检测到文章被用户修改时，会触发修改属性的函数，而“修改属性”本身又是一种修改，为了防止后者被检测到而无休止的修改，
+			// 添加callBySystem用于防止函数本身做出的修改行为视作用户的修改检测。
 			if (file instanceof TFile && !callBySystem) { // 非系统触发的修改:即用户触发的修改
 				// 清除之前的定时器
-				clearTimeout(timeoutId);
+				window.clearTimeout(timeoutId);
 				// 设置新的定时器，在输入停止后的 2000 毫秒执行操作
 				// 延迟触发函数
-				timeoutId = setTimeout(function () {
+				timeoutId = window.setTimeout(function () {
 					// 在这里执行你的操作
 					// console.log('用户停止输入了，现在可以执行相关操作');
 					callBySystem = true;

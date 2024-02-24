@@ -1,7 +1,7 @@
 {
 	"id": "hugo-helper",
-	"name": "hugo-helper",
-	"version": "1.0.4",
+	"name": "HugoHelper",
+	"version": "1.0.5",
 	"minAppVersion": "0.15.0",
 	"description": "用于快捷创建hugo文章、自动修改标题，分类，最后修改时间信息。",
 	"author": "tignioj",
